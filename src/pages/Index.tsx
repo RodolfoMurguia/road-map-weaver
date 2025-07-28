@@ -7,6 +7,7 @@ import { TaskCard } from '@/components/TaskCard';
 import { TaskForm } from '@/components/TaskForm';
 import { WeekView } from '@/components/WeekView';
 import { MonthView } from '@/components/MonthView';
+import { QuarterView } from '@/components/QuarterView';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
@@ -187,14 +188,12 @@ const Index = () => {
         )}
 
         {viewMode === 'calendar-quarter' && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-lg">
-              La vista trimestral estará disponible próximamente.
-            </p>
-            <p className="text-muted-foreground">
-              Por ahora puedes usar las vistas semanal o mensual.
-            </p>
-          </div>
+          <QuarterView
+            tasks={filteredTasks}
+            users={users}
+            getUserById={getUserById}
+            onEditTask={handleEditTask}
+          />
         )}
 
         <TaskForm
