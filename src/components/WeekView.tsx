@@ -37,6 +37,29 @@ export const WeekView = ({ tasks, users, getUserById, onEditTask }: WeekViewProp
     });
   };
 
+  const getTaskBar = (task: Task) => {
+    const taskStart = task.startDate > weekStart ? task.startDate : weekStart;
+    const taskEnd = task.endDate < weekEnd ? task.endDate : weekEnd;
+    
+    const startDay = weekDays.findIndex(day => isSameDay(day, taskStart) || day >= taskStart);
+    const endDay = weekDays.findIndex(day => isSameDay(day, taskEnd) || day >= taskEnd);
+    
+    const actualStartDay = Math.max(0, startDay === -1 ? 0 : startDay);
+    const actualEndDay = Math.min(6, endDay === -1 ? 6 : endDay);
+    
+    const span = actualEndDay - actualStartDay + 1;
+    const leftOffset = (actualStartDay / 7) * 100;
+    const width = (span / 7) * 100;
+    
+    return { leftOffset, width, span };
+  };
+
+  const weekTasks = tasks.filter(task => 
+    isWithinInterval(task.startDate, { start: weekStart, end: weekEnd }) ||
+    isWithinInterval(task.endDate, { start: weekStart, end: weekEnd }) ||
+    (task.startDate <= weekStart && task.endDate >= weekEnd)
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -53,46 +76,67 @@ export const WeekView = ({ tasks, users, getUserById, onEditTask }: WeekViewProp
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-4">
+      {/* Header con días */}
+      <div className="grid grid-cols-7 gap-px bg-border rounded-lg overflow-hidden">
         {weekDays.map((day) => {
-          const dayTasks = getTasksForDay(day);
           const isToday = isSameDay(day, new Date());
-          
           return (
-            <Card key={day.toISOString()} className={`p-3 min-h-[200px] ${isToday ? 'ring-2 ring-primary' : ''}`}>
-              <div className="font-semibold text-sm mb-2 text-center">
-                <div className={`${isToday ? 'text-primary font-bold' : 'text-muted-foreground'}`}>
-                  {format(day, 'EEEE', { locale: es })}
-                </div>
-                <div className={`text-lg ${isToday ? 'text-primary font-bold' : ''}`}>
-                  {format(day, 'd', { locale: es })}
-                </div>
+            <div key={day.toISOString()} className="bg-card p-3 text-center">
+              <div className={`text-sm font-medium ${isToday ? 'text-primary' : 'text-muted-foreground'}`}>
+                {format(day, 'EEEE', { locale: es })}
               </div>
-              
-              <div className="space-y-2">
-                {dayTasks.map((task) => {
-                  const user = getUserById(task.assignedUserId);
-                  return (
-                    <div
-                      key={task.id}
-                      className="p-2 bg-primary/10 rounded cursor-pointer hover:bg-primary/20 transition-colors"
-                      onClick={() => onEditTask(task)}
-                    >
-                      <div className={`text-xs font-medium ${task.completed ? 'line-through text-muted-foreground' : ''}`}>
-                        {task.title}
-                      </div>
-                      {user && (
-                        <Badge variant="secondary" className="text-xs mt-1">
-                          {user.name}
-                        </Badge>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className={`text-lg font-bold ${isToday ? 'text-primary' : ''}`}>
+                {format(day, 'd', { locale: es })}
               </div>
-            </Card>
+            </div>
           );
         })}
+      </div>
+
+      {/* Timeline de tareas */}
+      <div className="space-y-2 min-h-[300px]">
+        {weekTasks.map((task) => {
+          const user = getUserById(task.assignedUserId);
+          const { leftOffset, width } = getTaskBar(task);
+          
+          return (
+            <div key={task.id} className="relative h-12">
+              <div
+                className={`absolute h-10 rounded-lg cursor-pointer transition-all duration-200 hover:scale-[1.02] hover:z-10 ${
+                  task.completed 
+                    ? 'bg-muted border-2 border-muted-foreground/20' 
+                    : 'bg-primary/15 border-2 border-primary/30 hover:bg-primary/25'
+                }`}
+                style={{
+                  left: `${leftOffset}%`,
+                  width: `${width}%`,
+                }}
+                onClick={() => onEditTask(task)}
+              >
+                <div className="p-2 h-full flex items-center justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className={`text-sm font-medium truncate ${
+                      task.completed ? 'line-through text-muted-foreground' : 'text-foreground'
+                    }`}>
+                      {task.title}
+                    </div>
+                  </div>
+                  {user && (
+                    <Badge variant="secondary" className="text-xs ml-2 shrink-0">
+                      {user.name}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        
+        {weekTasks.length === 0 && (
+          <div className="text-center text-muted-foreground py-12">
+            No hay tareas en esta semana
+          </div>
+        )}
       </div>
     </div>
   );
