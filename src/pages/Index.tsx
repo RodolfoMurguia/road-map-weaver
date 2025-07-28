@@ -5,6 +5,8 @@ import { RoadmapHeader } from '@/components/RoadmapHeader';
 import { TaskFilters } from '@/components/TaskFilters';
 import { TaskCard } from '@/components/TaskCard';
 import { TaskForm } from '@/components/TaskForm';
+import { WeekView } from '@/components/WeekView';
+import { MonthView } from '@/components/MonthView';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
@@ -85,15 +87,12 @@ const Index = () => {
     });
   };
 
-  const handleAddSubtask = (taskId: string) => {
-    const title = prompt('Título de la subtarea:');
-    if (title?.trim()) {
-      addSubtask(taskId, title.trim());
-      toast({
-        title: "Subtarea agregada",
-        description: "La subtarea se ha agregado correctamente.",
-      });
-    }
+  const handleAddSubtask = (taskId: string, title: string) => {
+    addSubtask(taskId, title);
+    toast({
+      title: "Subtarea agregada",
+      description: "La subtarea se ha agregado correctamente.",
+    });
   };
 
   const handleToggleSubtask = (taskId: string, subtaskId: string, completed: boolean) => {
@@ -169,13 +168,31 @@ const Index = () => {
           </div>
         )}
 
-        {viewMode !== 'list' && (
+        {viewMode === 'calendar-week' && (
+          <WeekView
+            tasks={filteredTasks}
+            users={users}
+            getUserById={getUserById}
+            onEditTask={handleEditTask}
+          />
+        )}
+
+        {viewMode === 'calendar-month' && (
+          <MonthView
+            tasks={filteredTasks}
+            users={users}
+            getUserById={getUserById}
+            onEditTask={handleEditTask}
+          />
+        )}
+
+        {viewMode === 'calendar-quarter' && (
           <div className="text-center py-12">
             <p className="text-muted-foreground text-lg">
-              Las vistas de calendario estarán disponibles próximamente.
+              La vista trimestral estará disponible próximamente.
             </p>
             <p className="text-muted-foreground">
-              Por ahora puedes usar la vista de lista para gestionar tus tareas.
+              Por ahora puedes usar las vistas semanal o mensual.
             </p>
           </div>
         )}

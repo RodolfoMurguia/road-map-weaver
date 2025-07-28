@@ -15,7 +15,7 @@ interface TaskCardProps {
   onEdit: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onToggleComplete: (taskId: string, completed: boolean) => void;
-  onAddSubtask: (taskId: string) => void;
+  onAddSubtask: (taskId: string, title: string) => void;
   onToggleSubtask: (taskId: string, subtaskId: string, completed: boolean) => void;
   onDeleteSubtask: (taskId: string, subtaskId: string) => void;
 }
@@ -43,7 +43,7 @@ export const TaskCard = ({
 
   const handleAddSubtask = () => {
     if (newSubtaskTitle.trim()) {
-      onAddSubtask(task.id);
+      onAddSubtask(task.id, newSubtaskTitle.trim());
       setNewSubtaskTitle('');
       setShowAddSubtask(false);
     }
