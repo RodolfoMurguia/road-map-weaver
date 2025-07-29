@@ -5,6 +5,7 @@ import { RoadmapHeader } from '@/components/RoadmapHeader';
 import { TaskFilters } from '@/components/TaskFilters';
 import { TaskCard } from '@/components/TaskCard';
 import { TaskForm } from '@/components/TaskForm';
+import { TaskDetailsDialog } from '@/components/TaskDetailsDialog';
 import { WeekView } from '@/components/WeekView';
 import { MonthView } from '@/components/MonthView';
 import { QuarterView } from '@/components/QuarterView';
@@ -27,6 +28,8 @@ const Index = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | undefined>();
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isTaskDetailsOpen, setIsTaskDetailsOpen] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<string | undefined>();
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'pending' | 'completed'>('all');
 
@@ -51,9 +54,15 @@ const Index = () => {
     setIsTaskFormOpen(true);
   };
 
+  const handleViewTaskDetails = (task: Task) => {
+    setSelectedTask(task);
+    setIsTaskDetailsOpen(true);
+  };
+
   const handleEditTask = (task: Task) => {
     setEditingTask(task);
     setIsTaskFormOpen(true);
+    setIsTaskDetailsOpen(false); // Cerrar detalles si está abierto
   };
 
   const handleSaveTask = (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'subtasks'>) => {
@@ -174,7 +183,7 @@ const Index = () => {
             tasks={filteredTasks}
             users={users}
             getUserById={getUserById}
-            onEditTask={handleEditTask}
+            onEditTask={handleViewTaskDetails}
           />
         )}
 
@@ -183,7 +192,7 @@ const Index = () => {
             tasks={filteredTasks}
             users={users}
             getUserById={getUserById}
-            onEditTask={handleEditTask}
+            onEditTask={handleViewTaskDetails}
           />
         )}
 
@@ -192,9 +201,23 @@ const Index = () => {
             tasks={filteredTasks}
             users={users}
             getUserById={getUserById}
-            onEditTask={handleEditTask}
+            onEditTask={handleViewTaskDetails}
           />
         )}
+
+        <TaskDetailsDialog
+          task={selectedTask}
+          user={selectedTask ? getUserById(selectedTask.assignedUserId) : undefined}
+          isOpen={isTaskDetailsOpen}
+          onClose={() => setIsTaskDetailsOpen(false)}
+          onEdit={handleEditTask}
+          onDelete={(taskId) => {
+            handleDeleteTask(taskId);
+            setIsTaskDetailsOpen(false);
+          }}
+          onToggleComplete={handleToggleTaskComplete}
+          onToggleSubtask={handleToggleSubtask}
+        />
 
         <TaskForm
           task={editingTask}
