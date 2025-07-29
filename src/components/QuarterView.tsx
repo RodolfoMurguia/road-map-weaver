@@ -29,23 +29,30 @@ export const QuarterView = ({ tasks, users, getUserById, onEditTask }: QuarterVi
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 3, 1));
   };
 
-  const getTaskPosition = (task: Task, monthStart: Date, monthEnd: Date) => {
-    const taskStart = task.startDate > monthStart ? task.startDate : monthStart;
-    const taskEnd = task.endDate < monthEnd ? task.endDate : monthEnd;
+  const getTaskPosition = (task: Task) => {
+    const taskStart = task.startDate > quarterStart ? task.startDate : quarterStart;
+    const taskEnd = task.endDate < quarterEnd ? task.endDate : quarterEnd;
     
-    const monthDuration = (monthEnd.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24);
-    const taskStartOffset = (taskStart.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24);
+    const quarterDuration = (quarterEnd.getTime() - quarterStart.getTime()) / (1000 * 60 * 60 * 24);
+    const taskStartOffset = (taskStart.getTime() - quarterStart.getTime()) / (1000 * 60 * 60 * 24);
     const taskDuration = (taskEnd.getTime() - taskStart.getTime()) / (1000 * 60 * 60 * 24) + 1;
     
     return {
-      left: Math.max(0, (taskStartOffset / monthDuration) * 100),
-      width: Math.min(100, (taskDuration / monthDuration) * 100)
+      left: Math.max(0, (taskStartOffset / quarterDuration) * 100),
+      width: Math.min(100, (taskDuration / quarterDuration) * 100)
     };
   };
 
   const getQuarterNumber = (date: Date) => {
     return Math.floor(date.getMonth() / 3) + 1;
   };
+
+  // Filtrar tareas del trimestre
+  const quarterTasks = tasks.filter(task => 
+    isWithinInterval(task.startDate, { start: quarterStart, end: quarterEnd }) ||
+    isWithinInterval(task.endDate, { start: quarterStart, end: quarterEnd }) ||
+    (task.startDate <= quarterStart && task.endDate >= quarterEnd)
+  );
 
   return (
     <div className="space-y-6">
@@ -63,95 +70,80 @@ export const QuarterView = ({ tasks, users, getUserById, onEditTask }: QuarterVi
         </div>
       </div>
 
-      <div className="space-y-6">
-        {months.map((month) => {
-          const monthStart = startOfMonth(month);
-          const monthEnd = endOfMonth(month);
-          const monthTasks = tasks.filter(task => 
-            isWithinInterval(task.startDate, { start: monthStart, end: monthEnd }) ||
-            isWithinInterval(task.endDate, { start: monthStart, end: monthEnd }) ||
-            (task.startDate <= monthStart && task.endDate >= monthEnd)
-          );
+      <Card className="p-6">
+        <div className="space-y-4">
+          {/* Header del trimestre */}
+          <div className="flex items-center justify-between border-b pb-3">
+            <h3 className="text-xl font-semibold">
+              Timeline del Trimestre
+            </h3>
+            <div className="text-sm text-muted-foreground">
+              {quarterTasks.length} {quarterTasks.length === 1 ? 'tarea' : 'tareas'}
+            </div>
+          </div>
 
-          const isCurrentMonth = isSameMonth(month, new Date());
-
-          return (
-            <Card key={month.toISOString()} className={`p-6 ${isCurrentMonth ? 'ring-2 ring-primary' : ''}`}>
-              <div className="space-y-4">
-                {/* Header del mes */}
-                <div className="flex items-center justify-between border-b pb-3">
-                  <h3 className={`text-xl font-semibold ${isCurrentMonth ? 'text-primary' : ''}`}>
-                    {format(month, 'MMMM yyyy', { locale: es })}
-                  </h3>
-                  <div className="text-sm text-muted-foreground">
-                    {monthTasks.length} {monthTasks.length === 1 ? 'tarea' : 'tareas'}
-                  </div>
-                </div>
-
-                {/* Timeline del mes */}
-                <div className="space-y-3 min-h-[120px]">
-                  {monthTasks.length === 0 ? (
-                    <div className="text-center text-muted-foreground py-8">
-                      No hay tareas en este mes
-                    </div>
-                  ) : (
-                    monthTasks.map((task, taskIndex) => {
-                      const user = getUserById(task.assignedUserId);
-                      const { left, width } = getTaskPosition(task, monthStart, monthEnd);
-                      
-                      return (
-                        <div key={task.id} className="relative h-12">
-                          <div
-                            className={`absolute h-10 rounded-lg cursor-pointer transition-all duration-200 hover:scale-[1.01] hover:z-10 ${
-                              task.completed 
-                                ? 'bg-muted border-2 border-muted-foreground/20' 
-                                : 'bg-primary/15 border-2 border-primary/30 hover:bg-primary/25'
-                            }`}
-                            style={{
-                              left: `${left}%`,
-                              width: `${Math.max(width, 8)}%`, // Mínimo 8% de ancho para que sea visible
-                            }}
-                            onClick={() => onEditTask(task)}
-                          >
-                            <div className="p-2 h-full flex items-center justify-between">
-                              <div className="flex-1 min-w-0">
-                                <div className={`text-sm font-medium truncate ${
-                                  task.completed ? 'line-through text-muted-foreground' : 'text-foreground'
-                                }`}>
-                                  {task.title}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {format(task.startDate, 'd MMM', { locale: es })} - {format(task.endDate, 'd MMM', { locale: es })}
-                                </div>
-                              </div>
-                              {user && width > 15 && (
-                                <Badge variant="secondary" className="text-xs ml-2 shrink-0">
-                                  {user.name}
-                                </Badge>
-                              )}
-                            </div>
+          {/* Timeline del trimestre */}
+          <div className="space-y-3 min-h-[300px]">
+            {quarterTasks.length === 0 ? (
+              <div className="text-center text-muted-foreground py-16">
+                No hay tareas en este trimestre
+              </div>
+            ) : (
+              quarterTasks.map((task) => {
+                const user = getUserById(task.assignedUserId);
+                const { left, width } = getTaskPosition(task);
+                
+                return (
+                  <div key={task.id} className="relative h-16">
+                    <div
+                      className={`absolute h-12 rounded-lg cursor-pointer transition-all duration-200 hover:scale-[1.01] hover:z-10 ${
+                        task.completed 
+                          ? 'bg-muted border-2 border-muted-foreground/20' 
+                          : 'bg-primary/15 border-2 border-primary/30 hover:bg-primary/25'
+                      }`}
+                      style={{
+                        left: `${left}%`,
+                        width: `${Math.max(width, 5)}%`, // Mínimo 5% de ancho para que sea visible
+                      }}
+                      onClick={() => onEditTask(task)}
+                    >
+                      <div className="p-3 h-full flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-sm font-medium truncate ${
+                            task.completed ? 'line-through text-muted-foreground' : 'text-foreground'
+                          }`}>
+                            {task.title}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {format(task.startDate, 'd MMM', { locale: es })} - {format(task.endDate, 'd MMM', { locale: es })}
                           </div>
                         </div>
-                      );
-                    })
-                  )}
-                </div>
-
-                {/* Línea de tiempo (días del mes) */}
-                <div className="relative">
-                  <div className="flex justify-between text-xs text-muted-foreground border-t pt-2">
-                    <span>1</span>
-                    <span>10</span>
-                    <span>20</span>
-                    <span>{format(monthEnd, 'd')}</span>
+                        {user && width > 10 && (
+                          <Badge variant="secondary" className="text-xs ml-2 shrink-0">
+                            {user.name}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="absolute top-0 left-0 w-full h-px bg-border"></div>
-                </div>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Línea de tiempo del trimestre (meses) */}
+          <div className="relative">
+            <div className="flex justify-between text-xs text-muted-foreground border-t pt-2">
+              {months.map((month) => (
+                <span key={month.toISOString()}>
+                  {format(month, 'MMM', { locale: es })}
+                </span>
+              ))}
+            </div>
+            <div className="absolute top-0 left-0 w-full h-px bg-border"></div>
+          </div>
+        </div>
+      </Card>
     </div>
   );
 };
