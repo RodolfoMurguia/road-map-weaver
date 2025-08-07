@@ -1,136 +1,194 @@
 import { useState, useEffect } from 'react';
 import { Task, User, RoadmapData, Subtask } from '@/types/roadmap';
-
-const DEFAULT_USERS: User[] = [
-  { id: '1', name: 'Ana García', email: 'ana@empresa.com' },
-  { id: '2', name: 'Carlos López', email: 'carlos@empresa.com' },
-  { id: '3', name: 'María Rodríguez', email: 'maria@empresa.com' },
-  { id: '4', name: 'Juan Pérez', email: 'juan@empresa.com' },
-  { id: '5', name: 'Laura Martín', email: 'laura@empresa.com' },
-];
-
-const STORAGE_KEY = 'roadmap-data';
+import { supabase } from '@/integrations/supabase/client';
 
 export const useRoadmap = () => {
   const [data, setData] = useState<RoadmapData>({
     tasks: [],
-    users: DEFAULT_USERS,
+    users: [],
   });
+  const [loading, setLoading] = useState(true);
 
-  // Load data from localStorage on mount
+  // Load data from Supabase on mount
   useEffect(() => {
-    const savedData = localStorage.getItem(STORAGE_KEY);
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        // Convert string dates back to Date objects
-        const tasks = parsed.tasks.map((task: any) => ({
-          ...task,
-          startDate: new Date(task.startDate),
-          endDate: new Date(task.endDate),
-          createdAt: new Date(task.createdAt),
-          updatedAt: new Date(task.updatedAt),
-          subtasks: task.subtasks.map((subtask: any) => ({
-            ...subtask,
-            createdAt: new Date(subtask.createdAt),
-          })),
-        }));
-        setData({ ...parsed, tasks });
-      } catch (error) {
-        console.error('Error loading saved data:', error);
-      }
-    }
+    loadData();
   }, []);
 
-  // Save data to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  }, [data]);
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load users
+      const { data: users, error: usersError } = await (supabase as any)
+        .from('users')
+        .select('*')
+        .order('name');
+      
+      if (usersError) throw usersError;
 
-  const addTask = (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'subtasks'>) => {
-    const newTask: Task = {
-      ...taskData,
-      id: crypto.randomUUID(),
-      subtasks: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    setData(prev => ({
-      ...prev,
-      tasks: [...prev.tasks, newTask].sort((a, b) => a.startDate.getTime() - b.startDate.getTime()),
-    }));
+      // Load tasks with subtasks
+      const { data: tasks, error: tasksError } = await (supabase as any)
+        .from('tasks')
+        .select(`
+          *,
+          subtasks (*)
+        `)
+        .order('start_date');
+      
+      if (tasksError) throw tasksError;
+
+      // Convert database format to frontend format
+      const formattedTasks = tasks?.map((task: any) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        startDate: new Date(task.start_date),
+        endDate: new Date(task.end_date),
+        assignedUserId: task.assigned_user_id,
+        completed: task.completed,
+        color: task.color,
+        createdAt: new Date(task.created_at),
+        updatedAt: new Date(task.updated_at),
+        subtasks: task.subtasks.map((subtask: any) => ({
+          id: subtask.id,
+          title: subtask.title,
+          completed: subtask.completed,
+          createdAt: new Date(subtask.created_at),
+        })),
+      })) || [];
+
+      setData({
+        tasks: formattedTasks,
+        users: users || [],
+      });
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateTask = (taskId: string, updates: Partial<Task>) => {
-    setData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task =>
-        task.id === taskId
-          ? { ...task, ...updates, updatedAt: new Date() }
-          : task
-      ),
-    }));
+  const addTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'subtasks'>) => {
+    try {
+      const { data: newTask, error } = await (supabase as any)
+        .from('tasks')
+        .insert({
+          title: taskData.title,
+          description: taskData.description,
+          start_date: taskData.startDate.toISOString(),
+          end_date: taskData.endDate.toISOString(),
+          assigned_user_id: taskData.assignedUserId,
+          completed: taskData.completed,
+          color: taskData.color,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await loadData(); // Refresh data
+    } catch (error) {
+      console.error('Error adding task:', error);
+      throw error;
+    }
   };
 
-  const deleteTask = (taskId: string) => {
-    setData(prev => ({
-      ...prev,
-      tasks: prev.tasks.filter(task => task.id !== taskId),
-    }));
+  const updateTask = async (taskId: string, updates: Partial<Task>) => {
+    try {
+      const updateData: any = {};
+      
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.startDate !== undefined) updateData.start_date = updates.startDate.toISOString();
+      if (updates.endDate !== undefined) updateData.end_date = updates.endDate.toISOString();
+      if (updates.assignedUserId !== undefined) updateData.assigned_user_id = updates.assignedUserId;
+      if (updates.completed !== undefined) updateData.completed = updates.completed;
+      if (updates.color !== undefined) updateData.color = updates.color;
+
+      const { error } = await (supabase as any)
+        .from('tasks')
+        .update(updateData)
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      await loadData(); // Refresh data
+    } catch (error) {
+      console.error('Error updating task:', error);
+      throw error;
+    }
   };
 
-  const addSubtask = (taskId: string, title: string) => {
-    const newSubtask: Subtask = {
-      id: crypto.randomUUID(),
-      title,
-      completed: false,
-      createdAt: new Date(),
-    };
+  const deleteTask = async (taskId: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('tasks')
+        .delete()
+        .eq('id', taskId);
 
-    setData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task =>
-        task.id === taskId
-          ? {
-              ...task,
-              subtasks: [...task.subtasks, newSubtask],
-              updatedAt: new Date(),
-            }
-          : task
-      ),
-    }));
+      if (error) throw error;
+
+      await loadData(); // Refresh data
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      throw error;
+    }
   };
 
-  const updateSubtask = (taskId: string, subtaskId: string, updates: Partial<Subtask>) => {
-    setData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task =>
-        task.id === taskId
-          ? {
-              ...task,
-              subtasks: task.subtasks.map(subtask =>
-                subtask.id === subtaskId ? { ...subtask, ...updates } : subtask
-              ),
-              updatedAt: new Date(),
-            }
-          : task
-      ),
-    }));
+  const addSubtask = async (taskId: string, title: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('subtasks')
+        .insert({
+          task_id: taskId,
+          title,
+          completed: false,
+        });
+
+      if (error) throw error;
+
+      await loadData(); // Refresh data
+    } catch (error) {
+      console.error('Error adding subtask:', error);
+      throw error;
+    }
   };
 
-  const deleteSubtask = (taskId: string, subtaskId: string) => {
-    setData(prev => ({
-      ...prev,
-      tasks: prev.tasks.map(task =>
-        task.id === taskId
-          ? {
-              ...task,
-              subtasks: task.subtasks.filter(subtask => subtask.id !== subtaskId),
-              updatedAt: new Date(),
-            }
-          : task
-      ),
-    }));
+  const updateSubtask = async (taskId: string, subtaskId: string, updates: Partial<Subtask>) => {
+    try {
+      const updateData: any = {};
+      
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.completed !== undefined) updateData.completed = updates.completed;
+
+      const { error } = await (supabase as any)
+        .from('subtasks')
+        .update(updateData)
+        .eq('id', subtaskId);
+
+      if (error) throw error;
+
+      await loadData(); // Refresh data
+    } catch (error) {
+      console.error('Error updating subtask:', error);
+      throw error;
+    }
+  };
+
+  const deleteSubtask = async (taskId: string, subtaskId: string) => {
+    try {
+      const { error } = await (supabase as any)
+        .from('subtasks')
+        .delete()
+        .eq('id', subtaskId);
+
+      if (error) throw error;
+
+      await loadData(); // Refresh data
+    } catch (error) {
+      console.error('Error deleting subtask:', error);
+      throw error;
+    }
   };
 
   const getUserById = (userId: string) => {
@@ -140,6 +198,7 @@ export const useRoadmap = () => {
   return {
     tasks: data.tasks,
     users: data.users,
+    loading,
     addTask,
     updateTask,
     deleteTask,

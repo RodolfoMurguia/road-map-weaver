@@ -15,6 +15,7 @@ const Index = () => {
   const {
     tasks,
     users,
+    loading,
     addTask,
     updateTask,
     deleteTask,
@@ -65,57 +66,107 @@ const Index = () => {
     setIsTaskDetailsOpen(false); // Cerrar detalles si está abierto
   };
 
-  const handleSaveTask = (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'subtasks'>) => {
-    if (editingTask) {
-      updateTask(editingTask.id, taskData);
+  const handleSaveTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'subtasks'>) => {
+    try {
+      if (editingTask) {
+        await updateTask(editingTask.id, taskData);
+        toast({
+          title: "Tarea actualizada",
+          description: "La tarea se ha actualizado correctamente.",
+        });
+      } else {
+        await addTask(taskData);
+        toast({
+          title: "Tarea creada",
+          description: "La nueva tarea se ha creado correctamente.",
+        });
+      }
+      setIsTaskFormOpen(false);
+      setEditingTask(undefined);
+    } catch (error) {
       toast({
-        title: "Tarea actualizada",
-        description: "La tarea se ha actualizado correctamente.",
-      });
-    } else {
-      addTask(taskData);
-      toast({
-        title: "Tarea creada",
-        description: "La nueva tarea se ha creado correctamente.",
+        title: "Error",
+        description: "Hubo un problema al guardar la tarea.",
+        variant: "destructive",
       });
     }
   };
 
-  const handleDeleteTask = (taskId: string) => {
-    deleteTask(taskId);
-    toast({
-      title: "Tarea eliminada",
-      description: "La tarea se ha eliminado correctamente.",
-    });
-  };
-
-  const handleToggleTaskComplete = (taskId: string, completed: boolean) => {
-    updateTask(taskId, { completed });
-    toast({
-      title: completed ? "Tarea completada" : "Tarea marcada como pendiente",
-      description: `La tarea se ha marcado como ${completed ? 'completada' : 'pendiente'}.`,
-    });
-  };
-
-  const handleAddSubtask = (taskId: string, title: string) => {
-    addSubtask(taskId, title);
-    toast({
-      title: "Subtarea agregada",
-      description: "La subtarea se ha agregado correctamente.",
-    });
-  };
-
-  const handleToggleSubtask = (taskId: string, subtaskId: string, completed: boolean) => {
-    updateSubtask(taskId, subtaskId, { completed });
-  };
-
-  const handleDeleteSubtask = (taskId: string, subtaskId: string) => {
-    if (confirm('¿Estás seguro de que quieres eliminar esta subtarea?')) {
-      deleteSubtask(taskId, subtaskId);
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask(taskId);
       toast({
-        title: "Subtarea eliminada",
-        description: "La subtarea se ha eliminado correctamente.",
+        title: "Tarea eliminada",
+        description: "La tarea se ha eliminado correctamente.",
       });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un problema al eliminar la tarea.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleTaskComplete = async (taskId: string, completed: boolean) => {
+    try {
+      await updateTask(taskId, { completed });
+      toast({
+        title: completed ? "Tarea completada" : "Tarea marcada como pendiente",
+        description: `La tarea se ha marcado como ${completed ? 'completada' : 'pendiente'}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un problema al actualizar la tarea.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleAddSubtask = async (taskId: string, title: string) => {
+    try {
+      await addSubtask(taskId, title);
+      toast({
+        title: "Subtarea agregada",
+        description: "La subtarea se ha agregado correctamente.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un problema al agregar la subtarea.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleToggleSubtask = async (taskId: string, subtaskId: string, completed: boolean) => {
+    try {
+      await updateSubtask(taskId, subtaskId, { completed });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Hubo un problema al actualizar la subtarea.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteSubtask = async (taskId: string, subtaskId: string) => {
+    if (confirm('¿Estás seguro de que quieres eliminar esta subtarea?')) {
+      try {
+        await deleteSubtask(taskId, subtaskId);
+        toast({
+          title: "Subtarea eliminada",
+          description: "La subtarea se ha eliminado correctamente.",
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Hubo un problema al eliminar la subtarea.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -144,41 +195,47 @@ const Index = () => {
           onClearFilters={handleClearFilters}
         />
 
-        {viewMode === 'list' && (
-          <div className="space-y-4">
-            {filteredTasks.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-muted-foreground text-lg mb-4">
-                  {tasks.length === 0 
-                    ? 'No hay tareas creadas aún' 
-                    : 'No se encontraron tareas con los filtros aplicados'
-                  }
-                </p>
-                {tasks.length === 0 && (
-                  <p className="text-muted-foreground">
-                    Comienza creando tu primera tarea para planificar tu roadmap.
-                  </p>
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Cargando datos...</p>
+          </div>
+        ) : (
+          <>
+            {viewMode === 'list' && (
+              <div className="space-y-4">
+                {filteredTasks.length === 0 ? (
+                  <div className="text-center py-12">
+                    <p className="text-muted-foreground text-lg mb-4">
+                      {tasks.length === 0 
+                        ? 'No hay tareas creadas aún' 
+                        : 'No se encontraron tareas con los filtros aplicados'
+                      }
+                    </p>
+                    {tasks.length === 0 && (
+                      <p className="text-muted-foreground">
+                        Comienza creando tu primera tarea para planificar tu roadmap.
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  filteredTasks.map(task => (
+                    <TaskCard
+                      key={task.id}
+                      task={task}
+                      user={getUserById(task.assignedUserId)}
+                      onEdit={handleEditTask}
+                      onDelete={handleDeleteTask}
+                      onToggleComplete={handleToggleTaskComplete}
+                      onAddSubtask={handleAddSubtask}
+                      onToggleSubtask={handleToggleSubtask}
+                      onDeleteSubtask={handleDeleteSubtask}
+                    />
+                  ))
                 )}
               </div>
-            ) : (
-              filteredTasks.map(task => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  user={getUserById(task.assignedUserId)}
-                  onEdit={handleEditTask}
-                  onDelete={handleDeleteTask}
-                  onToggleComplete={handleToggleTaskComplete}
-                  onAddSubtask={handleAddSubtask}
-                  onToggleSubtask={handleToggleSubtask}
-                  onDeleteSubtask={handleDeleteSubtask}
-                />
-              ))
             )}
-          </div>
-        )}
 
-        {viewMode === 'calendar-week' && (
+            {viewMode === 'calendar-week' && (
           <WeekView
             tasks={filteredTasks}
             users={users}
@@ -196,13 +253,15 @@ const Index = () => {
           />
         )}
 
-        {viewMode === 'calendar-quarter' && (
-          <QuarterView
-            tasks={filteredTasks}
-            users={users}
-            getUserById={getUserById}
-            onEditTask={handleViewTaskDetails}
-          />
+            {viewMode === 'calendar-quarter' && (
+              <QuarterView
+                tasks={filteredTasks}
+                users={users}
+                getUserById={getUserById}
+                onEditTask={handleViewTaskDetails}
+              />
+            )}
+          </>
         )}
 
         <TaskDetailsDialog
